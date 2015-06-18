@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RallyChartGenerator</title>
+
+    <script type="text/javascript" src="https://rally1.rallydev.com/apps/2.0/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("PieChartConfig",{extend:"Ext.Container",alias:"widget.piecharconfig",config:{wiTypes:[]}});
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",launch:function(){this._getTypes().then({success:this._addControls,scope:this})},_addControls:function(types){this.add([{xtype:"rallycustomfilterbutton",context:this.getContext(),modelNames:types,margin:"10px",stateful:!0,stateId:this.getContext().getScopedStateId("filters"),listeners:{customfilter:{fn:this._onFilterButtonStateAvailable,single:!0,scope:this}},toolTipConfig:{html:"Filter",anchor:"top",mouseOffset:[-9,-2]}},{xtype:"container",itemId:"wi_filter_box",defaults:{margin:10}},{xtype:"container",itemId:"chart_selector_box",defaults:{margin:10},items:[{xtype:"rallycombobox",displayField:"name",valueField:"value",editable:!1,store:Ext.create("Ext.data.Store",{fields:["name","value"],data:[{name:"Pie",value:"pie"},{name:"Bar",value:"bar"}]}),listeners:{select:function(combo,records){this._createChartConfigSection(combo,records)},scope:this}}]},{xtype:"container",itemId:"chart_config_box",defaults:{margin:10}}])},_getTypes:function(){return Ext.create("Rally.data.wsapi.Store",{model:"TypeDefinition",sorters:[{property:"Name"}],fetch:["DisplayName","ElementName","TypePath","Parent"],filters:[{property:"Creatable",value:!0}],remoteSort:!1,remoteFilter:!0}).load().then({success:function(records){var types=_.filter(records,function(record){var parent=record.get("Parent"),parentName=parent.ElementName;return _.contains(["Artifact","SchedulableArtifact","Requirement","PortfolioItem"],parentName)}),displayNames=_.map(types,function(type){return type.get("TypePath")});return displayNames.sort(),displayNames}})},_onFilterButtonStateAvailable:function(){},_createChartConfigSection:function(comboBox,selectedValue){this.down("#chart_config_box").removeAll();var selectedChartType=selectedValue[0].data.name;"pie"===selectedChartType&&this.down("#chart_config_box").add({xtype:"piecharconfig",wiTypes:this.down("rallycustomfilterbutton").getTypes()})}});
+
+            Rally.launchApp('CustomApp', {
+                name:"RallyChartGenerator",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        
+    </style>
+</head>
+<body>
+</body>
+</html>

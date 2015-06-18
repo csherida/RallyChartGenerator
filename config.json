@@ -1,0 +1,13 @@
+{
+   "name": "RallyChartGenerator",
+   "className": "CustomApp",
+   "server": "https://rally1.rallydev.com",
+   "sdk": "2.0",
+   "javascript": [
+      "PieChartConfig.js",
+      "App.js"
+   ],
+   "css": [
+      "app.css"
+   ]
+}
