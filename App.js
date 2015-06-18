@@ -34,9 +34,12 @@ Ext.define('CustomApp', {
             { xtype: 'container', itemId: 'wi_filter_box', defaults: { margin: 10 }},
             { xtype: 'container', itemId: 'chart_selector_box', defaults: { margin: 10 }, items: [{
                 xtype: 'rallycombobox',
+                itemId: 'chartType',
                 displayField: 'name',
                 valueField: 'value',
                 editable: false,
+                stateful: true,
+                stateId: this.getContext().getScopedStateId('chartType'),
                 store: Ext.create('Ext.data.Store', {
                     fields: ['name', 'value'],
                     data: [
@@ -89,19 +92,30 @@ Ext.define('CustomApp', {
     },
     
     _onFilterButtonStateAvailable: function() {
-        //todo
+        this._createChart(this.down('#chartType').getValue());
     },
     
     _createChartConfigSection: function(comboBox, selectedValue) {
         this.down('#chart_config_box').removeAll();
-        var selectedChartType = selectedValue[0].data.name;
-        
-        if (selectedChartType === 'Pie') {
-            this.down('#chart_config_box').add({
-                xtype: 'piecharconfig',
-                wiTypes: this.down('rallycustomfilterbutton').getTypes(),
-                context: this.getContext()
-            });
-        }
+        var selectedChartType = selectedValue[0].get('name');
+        this._createChart(selectedChartType);
+    },
+    
+    _createChart: function(type) {
+        var filterButton = this.down('rallycustomfilterbutton');
+        this.chart = this.add({
+            xtype: type + 'chart',
+            types: filterButton.getTypes(),
+            filters: filterButton.getFilters(),
+            context: this.getContext()
+        });  
+    },
+    
+    _showChart: function() {
+        var filterButton = this.down('rallycustomfilterbutton');
+        this.chart.refresh({
+            types: filterButton.getTypes(),
+            filters: filterButton.getFilters()
+        });
     }
 });

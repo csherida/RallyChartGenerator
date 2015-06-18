@@ -4,7 +4,8 @@
    "server": "https://rally1.rallydev.com",
    "sdk": "2.0",
    "javascript": [
-      "PieChartConfig.js",
+      "pie/Calculator.js",
+      "pie/Chart.js",
       "App.js"
    ],
    "css": [

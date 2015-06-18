@@ -7,11 +7,124 @@
 
     <script type="text/javascript">
         Rally.onReady(function () {
-                Ext.define('PieChartConfig', {
+                Ext.define('PieCalculator', {
+   prepareChartData: function(store) {
+        var categories = [];
+        var seriesData = [];
+
+        //Perform aggregation of data from store
+        store.each(function(record) {
+            //bucket data into categories
+            //aggregate and push series data values
+        });
+
+        return {
+            categories: categories,
+            series: [
+                {
+                    type: 'column',
+                    data: seriesData
+                }
+            ]
+        };
+    }
+});
+                
+Ext.define('PieChart', {
     extend: 'Ext.Container',
-    alias: 'widget.piecharconfig',
+    alias: 'widget.piechart',
     config: {
-        wiTypes: []
+        wiTypes: [],
+        context: undefined
+    },
+    
+    initComponent: function() {
+        this.callParent(arguments);
+        Rally.data.ModelFactory.getModels({
+            types: this.wiTypes
+        }).then({
+            success: this._addControls,
+            scope: this
+        });
+    },
+    
+    drawChart: function(config) {
+        var chart = this.down('rallychart');
+        if(chart) {
+            chart.destroy();
+        }
+
+        this.add({
+            xtype: 'rallychart',
+            storeType: 'Rally.data.wsapi.Store',
+            storeConfig: {
+                models: config.types,
+                context: this.getContext().getDataContext(),
+                limit: Infinity,
+                filters: config.filters
+            },
+            calculatorType: 'Calculator',
+            calculatorConfig: {},
+            chartConfig: {
+                chart: { type: 'pie' },
+                title: { text: 'Chart' },
+                plotOptions: {
+                    pie: {
+                        minSize: 500,
+                        dataLabels: {
+                            distance: -30,
+                            color: 'white'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    _addControls: function(models) {
+        var wiTypes = _.values(models);
+        var validFields = this._getValidFields(wiTypes);
+        
+        this.add([{
+            xtype: 'rallycombobox',
+            displayField: 'displayName',
+            valueField: 'name',
+            editable: false,
+            store: Ext.create('Ext.data.Store', {
+                fields: ['name', 'displayName'],
+                data: _.map(validFields, function(field) {
+                    return {
+                        displayName: Rally.ui.renderer.FieldDisplayNameRenderer.getDisplayName(field),
+                        name: field.name
+                    };
+                })
+            })
+        }, {
+        xtype: 'radiogroup',
+        columns: 2,
+        items: [
+            { boxLabel: 'Sum', name: 'calculationType', inputValue: 'sum' },
+            { boxLabel: 'Count', name: 'calculationType', inputValue: 'count', checked: true}
+        ]
+    }]);
+    },
+    
+     _getValidFields: function(models) {
+        this.model = this._getArtifactModel(models);
+        var fields = _(this.model.getFields()).filter(this._shouldShowField, this).sortBy('displayName').value();
+        return _.filter(fields, function(field) {
+            return _.every(models, function(model) {
+                return model.hasField(field.name);
+            });
+        }, this);
+    },
+
+    _getArtifactModel: function(models) {
+        return Rally.data.wsapi.ModelBuilder.buildCompositeArtifact(models, this.getContext());
+    },
+
+    _shouldShowField: function(field) {
+        return !field.hidden && field.attributeDefinition && field.getType() !== 'collection';
     }
 });
                 Ext.define('CustomApp', {
@@ -105,19 +218,25 @@
     },
     
     _onFilterButtonStateAvailable: function() {
-        //todo
+        this._showChart();
     },
     
     _createChartConfigSection: function(comboBox, selectedValue) {
         this.down('#chart_config_box').removeAll();
-        var selectedChartType = selectedValue[0].data.name;
-        
-        if (selectedChartType === 'pie') {
-            this.down('#chart_config_box').add({
-                xtype: 'piecharconfig',
-                wiTypes: this.down('rallycustomfilterbutton').getTypes()
-            });
-        }
+        var selectedChartType = selectedValue[0].get('name');
+        this.add({
+            xtype: selectedChartType + 'chart',
+            wiTypes: this.down('rallycustomfilterbutton').getTypes(),
+            context: this.getContext()
+        });
+    },
+    
+    _showChart: function() {
+        var filterButton = this.down('rallycustomfilterbutton');
+        this.chart.drawChart({
+            types: filterButton.getTypes(),
+            filters: filterButton.getFilters()
+        });
     }
 });
 
