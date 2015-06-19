@@ -1004,7 +1004,7 @@ Ext.define('BurnChart', {
                     margin: '100px 0 0 0',
                     xtype: 'rallycombobox',
                     itemId: 'aggregationField',
-                    fieldLabel: 'Flow by:',
+                    fieldLabel: 'Burn by:',
                     labelAlign: 'top',
                     labelWidth: 60,
                     displayField: 'displayName',
@@ -1073,21 +1073,6 @@ Ext.define('BurnChart', {
     },
 
     _getStoreConfig: function() {
-        /*
-        {
-                        find: {
-                            _ItemHierarchy: PI_OID,
-                            _TypeHierarchy: 'HierarchicalRequirement',
-                            Children: null
-                        },
-                        fetch: ['ScheduleState', 'PlanEstimate'],
-                        hydrate: ['ScheduleState'],
-                        sort: {
-                            _ValidFrom: 1
-                        },
-                        context: this.getContext().getDataContext(),
-                        limit: Infinity
-                    };*/
         var storeConfig = {
             find: {
                 _TypeHierarchy: { '$in' : _.map(this.model.getArtifactComponentModels(), function(m) {
@@ -1109,6 +1094,30 @@ Ext.define('BurnChart', {
             context: this.getContext().getDataContext(),
             limit: Infinity
         };
+        
+        if(this.filters.length && this.filters[0].property === 'Feature') {
+            var featureRef = this.filters[0].value;
+            var featureOid = Rally.util.Ref.getOidFromRef(featureRef);
+            delete storeConfig.find._ProjectHierarchy;
+            storeConfig.find._ItemHierarchy = featureOid;
+            return Rally.data.ModelFactory.getModel({
+                type: Rally.util.Ref.getTypeFromRef(featureRef)
+            }).then({
+                success: function(model) {
+                    return model.load(featureOid, {
+                        fetch: ['ActualStartDate']
+                    }).then({
+                        success: function(record) {
+                            storeConfig.find._ValidFrom.$gt = Rally.util.DateTime.toIsoString(record.get('ActualStartDate'));
+                            return storeConfig;
+                        },
+                        scope: this
+                    });
+                },
+                scope: this
+            });
+        } 
+
         return Deft.Promise.when(storeConfig);
     },
 
