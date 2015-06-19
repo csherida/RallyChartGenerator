@@ -56,7 +56,8 @@ Ext.define('CustomApp', {
                         fields: ['name', 'value'],
                         data: [
                             { name: 'Pie', value: 'pie' },
-                            { name: 'Bar', value: 'bar' }
+                            { name: 'Bar', value: 'bar' },
+                            { name: 'Cumulative Flow', value: 'cfd'}
                         ]
                     }),
                      applyState: function(state) {
@@ -116,7 +117,7 @@ Ext.define('CustomApp', {
     _createChartConfigSection: function(comboBox, selectedValue) {
         this.down('#chart_config_box').removeAll();
         delete this.chart;
-        var selectedChartType = selectedValue[0].get('name');
+        var selectedChartType = selectedValue[0].get('value');
         this._createChart(selectedChartType);
     },
     
@@ -127,7 +128,6 @@ Ext.define('CustomApp', {
                 filters: filterButton.getFilters()
             };
         if(!this.chart) {
-            //debugger;
             this.down('#chart_config_box').removeAll();
             this.chart = this.down('#chart_config_box').add(Ext.apply({
                 xtype: type + 'chart',

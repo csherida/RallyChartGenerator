@@ -8,6 +8,8 @@
       "bar/Chart.js",
       "pie/Calculator.js",
       "pie/Chart.js",
+      "cfd/Calculator.js",
+      "cfd/Chart.js",
       "App.js"
    ],
    "css": [

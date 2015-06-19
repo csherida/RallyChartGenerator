@@ -1,7 +1,7 @@
 
-Ext.define('PieChart', {
+Ext.define('CfdChart', {
     extend: 'Ext.Container',
-    alias: 'widget.piechart',
+    alias: 'widget.cfdchart',
     config: {
         types: [],
         context: undefined,
@@ -48,7 +48,7 @@ Ext.define('PieChart', {
                     margin: '100px 0 0 0',
                     xtype: 'rallycombobox',
                     itemId: 'aggregationField',
-                    fieldLabel: 'Slice By:',
+                    fieldLabel: 'Flow by:',
                     labelAlign: 'top',
                     labelWidth: 60,
                     displayField: 'displayName',
@@ -115,42 +115,96 @@ Ext.define('PieChart', {
             return Ext.String.format('<li>{0}</li>', filter.toString());
         }).join('')) || 'Showing all data';
     },
+
+    _getStoreConfig: function() {
+        var storeConfig = {
+            find: {
+                _TypeHierarchy: { '$in' : _.map(this.model.getArtifactComponentModels(), function(m) {
+                    var typeInfo = Rally.util.TypeInfo.getTypeInfoByName(m.typePath);
+                    return typeInfo.schemaType || ''; //todo pi's?
+                }) },
+                Children: null,
+                _ProjectHierarchy: this.getContext().getProject().ObjectID,
+                _ValidFrom: {
+                    //TODO: replace default date filter?
+                    '$gt': Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(), 'day', -30)) 
+                }
+            },
+            fetch: ['PlanEstimate', this.down('#aggregationField').getValue()],
+            hydrate: [this.down('#aggregationField').getValue()],
+            sort: {
+                _ValidFrom: 1
+            },
+            context: this.getContext().getDataContext(),
+            limit: Infinity
+        };
+        return Deft.Promise.when(storeConfig);
+    },
+
+    _getAggregationFieldValues: function() {
+        return this.model.getField(this.down('#aggregationField').getValue()).getAllowedValueStore().load();
+    },
     
     _showChart: function() {
-       this.insert(2, {
-            xtype: 'rallychart',
-            flex: 10,
-            storeType: 'Rally.data.wsapi.artifact.Store',
-            storeConfig: {
-                models: this.types,
-                context: this.getContext().getDataContext(),
-                limit: Infinity,
-                filters: this.filters
-            },
-            calculatorType: 'PieCalculator',
-            calculatorConfig: {
-                calculationType: this.down('radiogroup').getValue().calculationType,
-                field: this.down('#aggregationField').getValue()
-            },
-            chartConfig: {
-                chart: { type: 'pie' },
-                title: { 
-                    text: Ext.String.format('{0} - {1}', 
-                        this.getContext().getProject().Name,
-                        _.map(this.types, function(type) {
-                            return Rally.util.TypeInfo.getTypeInfoByName(type).typeName; 
-                        }).join(', '))
-                },
-                plotOptions: {
-                    pie: {
-                        minSize: 500,
-                        dataLabels: {
-                            distance: -30,
-                            color: 'white'
+        Deft.Promise.all([
+            this._getStoreConfig(), 
+            this._getAggregationFieldValues()]
+        ).then({
+            success: function(results) {
+                var storeConfig = results[0],
+                    stateFieldValues = _.invoke(results[1], 'get', 'StringValue');
+
+                this.insert(2, {
+                    xtype: 'rallychart',
+                    flex: 10,
+                    storeType: 'Rally.data.lookback.SnapshotStore',
+                    storeConfig: storeConfig,
+                    calculatorType: 'CfdCalculator',
+                    calculatorConfig: {
+                        calculationType: this.down('radiogroup').getValue().calculationType,
+                        stateFieldName: this.down('#aggregationField').getValue(),
+                        stateFieldValues: stateFieldValues
+                    },
+                    chartConfig: {
+                        chart: {
+                            zoomType: 'xy'
+                        },
+                        title: {
+                            text: Ext.String.format('{0} Cumulative Flow - {1}', 
+                                this.getContext().getProject().Name,
+                                _.map(this.types, function(type) {
+                                    return Rally.util.TypeInfo.getTypeInfoByName(type).typeName; 
+                                }).join(', '))
+                        },
+                        xAxis: {
+                            tickmarkPlacement: 'on',
+                            tickInterval: 20,
+                            title: {
+                                text: 'Date'
+                            }
+                        },
+                        yAxis: [
+                            {
+                                title: {
+                                    text: this.down('radiogroup').getValue().calculationType === 'count' ? 
+                                        'Count' : this.getContext().getWorkspace().WorkspaceConfiguration.IterationEstimateUnitName
+                                }
+                            }
+                        ],
+                        plotOptions: {
+                            series: {
+                                marker: {
+                                    enabled: false
+                                }
+                            },
+                            area: {
+                                stacking: 'normal'
+                            }
                         }
                     }
-                }
-            }
+                });
+            },
+            scope: this
         });  
     },
     
@@ -169,6 +223,7 @@ Ext.define('PieChart', {
     },
 
     _shouldShowField: function(field) {
-        return !field.hidden && field.attributeDefinition && field.getType() !== 'collection';
+        return !field.hidden && field.attributeDefinition && 
+        field.getType() !== 'collection' && field.hasAllowedValues();
     }
 });

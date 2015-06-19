@@ -118,7 +118,7 @@ Ext.define('BarChart', {
     _showChart: function() {
        this.insert(2, {
             xtype: 'rallychart',
-            flex: 1,
+            flex: 10,
             storeType: 'Rally.data.wsapi.artifact.Store',
             storeConfig: {
                 models: this.types,
