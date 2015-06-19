@@ -1,6 +1,6 @@
 Ext.define('BarCalculator', {
     config: {
-        calculationType: undefined,
+        barCalculationType: undefined,
         field: undefined
     },
     
@@ -10,7 +10,7 @@ Ext.define('BarCalculator', {
     
     prepareChartData: function(store) {
         var categories, seriesData, data;
-        if(this.calculationType === 'count') {
+        if(this.barCalculationType === 'count') {
             data = _.countBy(store.getRange(), function(record) { 
                 return record.get(this.field); 
             }, this);
