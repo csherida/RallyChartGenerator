@@ -57,7 +57,8 @@ Ext.define('CustomApp', {
                         data: [
                             { name: 'Pie', value: 'pie' },
                             { name: 'Bar', value: 'bar' },
-                            { name: 'Cumulative Flow', value: 'cfd'}
+                            { name: 'Cumulative Flow', value: 'cfd'},
+                            { name: 'Burn', value: 'burn'}
                         ]
                     }),
                      applyState: function(state) {

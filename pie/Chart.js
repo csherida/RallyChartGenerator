@@ -125,7 +125,8 @@ Ext.define('PieChart', {
                 models: this.types,
                 context: this.getContext().getDataContext(),
                 limit: Infinity,
-                filters: this.filters
+                filters: this.filters,
+                fetch: ['PlanEstimate', this.down('#aggregationField').getValue()]
             },
             calculatorType: 'PieCalculator',
             calculatorConfig: {

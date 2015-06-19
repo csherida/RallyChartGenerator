@@ -10,6 +10,8 @@
       "pie/Chart.js",
       "cfd/Calculator.js",
       "cfd/Chart.js",
+      "burn/Calculator.js",
+      "burn/Chart.js",
       "App.js"
    ],
    "css": [
