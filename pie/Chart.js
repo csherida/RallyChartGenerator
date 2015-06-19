@@ -7,6 +7,11 @@ Ext.define('PieChart', {
         context: undefined
     },
     
+    layout: {
+        type: 'hbox',
+        align: 'stretch'
+    },
+    
     initComponent: function() {
         this.callParent(arguments);
         Rally.data.ModelFactory.getModels({
@@ -19,11 +24,11 @@ Ext.define('PieChart', {
     
     refresh: function(config) {
         Ext.apply(this, config);
-        var chart = this.down('rallychart');
-        if(chart) {
-            chart.destroy();
+        if(this.down('rallychart')) {
+            this.down('rallychart').destroy();
         }
         this._showChart();
+        this.down('#filterSummary').update(this._getFilterSummaryHtml());
     },
     
     _addControls: function(models) {
@@ -32,53 +37,88 @@ Ext.define('PieChart', {
         
         this.add([
             {
-                xtype: 'rallycombobox',
-                itemId: 'aggregationField',
-                displayField: 'displayName',
-                valueField: 'name',
-                editable: false,
-                stateful: true,
-                stateId: this.getContext().getScopedStateId('aggregationField'),
-                store: Ext.create('Ext.data.Store', {
-                    fields: ['name', 'displayName'],
-                    data: _.map(validFields, function(field) {
-                        return {
-                            displayName: Rally.ui.renderer.FieldDisplayNameRenderer.getDisplayName(field),
-                            name: field.name
-                        };
-                    })
-                }),
-                listeners: {
-                    select: function() {
-                        this.refresh();
-                    },
-                    scope: this
-                }
+                xtype: 'component',
+                flex: 1
             }, 
             {
-                xtype: 'radiogroup',
-                stateful: true,
-                stateId: this.getContext().getScopedStateId('calculationType'),
-                columns: 2,
-                items: [
-                    { boxLabel: 'Sum', name: 'calculationType', inputValue: 'sum' },
-                    { boxLabel: 'Count', name: 'calculationType', inputValue: 'count', checked: true}
-                ],
-                 listeners: {
-                    change: function() {
-                        this.refresh();
+                xtype: 'container',
+                items: [{
+                    width: 250,
+                    margin: '100px 0 0 0',
+                    xtype: 'rallycombobox',
+                    itemId: 'aggregationField',
+                    fieldLabel: 'Slice By:',
+                    labelAlign: 'top',
+                    labelWidth: 60,
+                    displayField: 'displayName',
+                    valueField: 'name',
+                    editable: false,
+                    stateful: true,
+                    stateId: this.getContext().getScopedStateId('aggregationField'),
+                    store: Ext.create('Ext.data.Store', {
+                        fields: ['name', 'displayName'],
+                        data: _.map(validFields, function(field) {
+                            return {
+                                displayName: Rally.ui.renderer.FieldDisplayNameRenderer.getDisplayName(field),
+                                name: field.name
+                            };
+                        })
+                    }),
+                    applyState: function(state) {
+                        //hack alert
+                        //this function is necessary to work around a defect in the sdk
+                        Rally.ui.combobox.ComboBox.superclass.applyState.call(this, state);
                     },
-                    scope: this
-                }
+                    listeners: {
+                        select: function() {
+                            this.refresh();
+                        },
+                        scope: this
+                    }
+                }, 
+                {
+                    xtype: 'radiogroup',
+                    stateful: true,
+                    stateId: this.getContext().getScopedStateId('calculationType'),
+                    columns: 1,
+                    items: [
+                        { boxLabel: 'Sum', name: 'calculationType', inputValue: 'sum' },
+                        { boxLabel: 'Count', name: 'calculationType', inputValue: 'count', checked: true}
+                    ],
+                     listeners: {
+                        change: function() {
+                            this.refresh();
+                        },
+                        scope: this
+                    }
+                }]
+            },
+            {
+                xtype: 'component',
+                width: 250,
+                itemId: 'filterSummary',
+                margin: '100px 0 0 0',
+                html: this._getFilterSummaryHtml()
+            },
+            {
+                xtype: 'component',
+                flex: 1
             }
         ]);
         
        this._showChart();
     },
     
+    _getFilterSummaryHtml: function() {
+        return Ext.String.format('<ul>{0}</ul>', _.map(this.filters, function(filter) {
+            return Ext.String.format('<li>{0}</li>', filter.toString());
+        }).join(''));
+    },
+    
     _showChart: function() {
-       this.add({
+       this.insert(2, {
             xtype: 'rallychart',
+            flex: 1,
             storeType: 'Rally.data.wsapi.artifact.Store',
             storeConfig: {
                 models: this.types,
@@ -93,7 +133,13 @@ Ext.define('PieChart', {
             },
             chartConfig: {
                 chart: { type: 'pie' },
-                title: { text: 'Chart' },
+                title: { 
+                    text: Ext.String.format('{0} - {1}', 
+                        this.getContext().getProject().Name,
+                        _.map(this.types, function(type) {
+                            return Rally.util.TypeInfo.getTypeInfoByName(type).typeName; 
+                        }).join(', '))
+                },
                 plotOptions: {
                     pie: {
                         minSize: 500,

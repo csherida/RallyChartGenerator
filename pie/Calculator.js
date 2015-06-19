@@ -19,10 +19,12 @@ Ext.define('PieCalculator', {
             _.each(data, function(value, key) {
                 seriesData.push([key, value]);    
             });
+            console.log(seriesData);
         } else {
             var data = _.groupBy(store.getRange(), function(record) {
                 return record.get(this.field);
             }, this);
+            console.log(data);
             categories = _.keys(data);
             seriesData = [];
             _.each(data, function(value, key) {
@@ -30,6 +32,7 @@ Ext.define('PieCalculator', {
                     return total + r.get('PlanEstimate');
                 }, 0)]);
             });
+            console.log(seriesData);
         }
         
         return {
