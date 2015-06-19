@@ -9,9 +9,9 @@ Ext.define('PieCalculator', {
     },
     
     prepareChartData: function(store) {
-        var categories, seriesData;
+        var categories, seriesData, data;
         if(this.calculationType === 'count') {
-            var data = _.countBy(store.getRange(), function(record) { 
+            data = _.countBy(store.getRange(), function(record) { 
                 return record.get(this.field); 
             }, this);
             categories = _.keys(data);
@@ -21,10 +21,9 @@ Ext.define('PieCalculator', {
             });
             console.log(seriesData);
         } else {
-            var data = _.groupBy(store.getRange(), function(record) {
+            data = _.groupBy(store.getRange(), function(record) {
                 return record.get(this.field);
             }, this);
-            console.log(data);
             categories = _.keys(data);
             seriesData = [];
             _.each(data, function(value, key) {

@@ -8,21 +8,46 @@
     <script type="text/javascript">
         Rally.onReady(function () {
                 Ext.define('PieCalculator', {
-   prepareChartData: function(store) {
-        var categories = [];
-        var seriesData = [];
-
-        //Perform aggregation of data from store
-        store.each(function(record) {
-            //bucket data into categories
-            //aggregate and push series data values
-        });
-
+    config: {
+        calculationType: undefined,
+        field: undefined
+    },
+    
+    constructor: function(config) {
+        this.initConfig(config);    
+    },
+    
+    prepareChartData: function(store) {
+        var categories, seriesData, data;
+        if(this.calculationType === 'count') {
+            data = _.countBy(store.getRange(), function(record) { 
+                return record.get(this.field); 
+            }, this);
+            categories = _.keys(data);
+            seriesData = [];
+            _.each(data, function(value, key) {
+                seriesData.push([key, value]);    
+            });
+            console.log(seriesData);
+        } else {
+            data = _.groupBy(store.getRange(), function(record) {
+                return record.get(this.field);
+            }, this);
+            categories = _.keys(data);
+            seriesData = [];
+            _.each(data, function(value, key) {
+                seriesData.push([key, _.reduce(value, function(total, r) {
+                    return total + r.get('PlanEstimate');
+                }, 0)]);
+            });
+            console.log(seriesData);
+        }
+        
         return {
             categories: categories,
             series: [
                 {
-                    type: 'column',
+                    type: 'pie',
                     data: seriesData
                 }
             ]
@@ -34,40 +59,143 @@ Ext.define('PieChart', {
     extend: 'Ext.Container',
     alias: 'widget.piechart',
     config: {
-        wiTypes: [],
+        types: [],
         context: undefined
+    },
+    
+    layout: {
+        type: 'hbox',
+        align: 'stretch'
     },
     
     initComponent: function() {
         this.callParent(arguments);
         Rally.data.ModelFactory.getModels({
-            types: this.wiTypes
+            types: this.types
         }).then({
             success: this._addControls,
             scope: this
         });
     },
     
-    drawChart: function(config) {
-        var chart = this.down('rallychart');
-        if(chart) {
-            chart.destroy();
+    refresh: function(config) {
+        Ext.apply(this, config);
+        if(this.down('rallychart')) {
+            this.down('rallychart').destroy();
         }
-
-        this.add({
+        this._showChart();
+        this.down('#filterSummary').update(this._getFilterSummaryHtml());
+    },
+    
+    _addControls: function(models) {
+        var wiTypes = _.values(models);
+        var validFields = this._getValidFields(wiTypes);
+        
+        this.add([
+            {
+                xtype: 'component',
+                flex: 1
+            }, 
+            {
+                xtype: 'container',
+                items: [{
+                    width: 250,
+                    margin: '100px 0 0 0',
+                    xtype: 'rallycombobox',
+                    itemId: 'aggregationField',
+                    fieldLabel: 'Slice By:',
+                    labelAlign: 'top',
+                    labelWidth: 60,
+                    displayField: 'displayName',
+                    valueField: 'name',
+                    editable: false,
+                    stateful: true,
+                    stateId: this.getContext().getScopedStateId('aggregationField'),
+                    store: Ext.create('Ext.data.Store', {
+                        fields: ['name', 'displayName'],
+                        data: _.map(validFields, function(field) {
+                            return {
+                                displayName: Rally.ui.renderer.FieldDisplayNameRenderer.getDisplayName(field),
+                                name: field.name
+                            };
+                        })
+                    }),
+                    applyState: function(state) {
+                        //hack alert
+                        //this function is necessary to work around a defect in the sdk
+                        Rally.ui.combobox.ComboBox.superclass.applyState.call(this, state);
+                    },
+                    listeners: {
+                        select: function() {
+                            this.refresh();
+                        },
+                        scope: this
+                    }
+                }, 
+                {
+                    xtype: 'radiogroup',
+                    stateful: true,
+                    stateId: this.getContext().getScopedStateId('calculationType'),
+                    columns: 1,
+                    items: [
+                        { boxLabel: 'Sum', name: 'calculationType', inputValue: 'sum' },
+                        { boxLabel: 'Count', name: 'calculationType', inputValue: 'count', checked: true}
+                    ],
+                     listeners: {
+                        change: function() {
+                            this.refresh();
+                        },
+                        scope: this
+                    }
+                }]
+            },
+            {
+                xtype: 'component',
+                width: 250,
+                itemId: 'filterSummary',
+                margin: '100px 0 0 0',
+                html: this._getFilterSummaryHtml()
+            },
+            {
+                xtype: 'component',
+                flex: 1
+            }
+        ]);
+        
+       this._showChart();
+    },
+    
+    _getFilterSummaryHtml: function() {
+        return Ext.String.format('<ul>{0}</ul>', _.map(this.filters, function(filter) {
+            return Ext.String.format('<li>{0}</li>', filter.toString());
+        }).join(''));
+    },
+    
+    _showChart: function() {
+       this.insert(2, {
             xtype: 'rallychart',
-            storeType: 'Rally.data.wsapi.Store',
+            flex: 1,
+            storeType: 'Rally.data.wsapi.artifact.Store',
             storeConfig: {
-                models: config.types,
+                models: this.types,
                 context: this.getContext().getDataContext(),
                 limit: Infinity,
-                filters: config.filters
+                filters: this.filters
             },
-            calculatorType: 'Calculator',
-            calculatorConfig: {},
+            calculatorType: 'PieCalculator',
+            calculatorConfig: {
+                calculationType: this.down('radiogroup').getValue().calculationType,
+                field: this.down('#aggregationField').getValue()
+            },
             chartConfig: {
                 chart: { type: 'pie' },
-                title: { text: 'Chart' },
+                title: { 
+                    text: Ext.String.format('{0} - {1}', 
+                        this.getContext().getProject().Name,
+                        _.map(this.types, function(type) {
+                            return Rally.util.TypeInfo.getTypeInfoByName(type).typeName; 
+                        }).join(', '))
+                },
                 plotOptions: {
                     pie: {
                         minSize: 500,
@@ -78,38 +206,10 @@ Ext.define('PieChart', {
                     }
                 }
             }
-        });
+        });  
     },
     
-    _addControls: function(models) {
-        var wiTypes = _.values(models);
-        var validFields = this._getValidFields(wiTypes);
-        
-        this.add([{
-            xtype: 'rallycombobox',
-            displayField: 'displayName',
-            valueField: 'name',
-            editable: false,
-            store: Ext.create('Ext.data.Store', {
-                fields: ['name', 'displayName'],
-                data: _.map(validFields, function(field) {
-                    return {
-                        displayName: Rally.ui.renderer.FieldDisplayNameRenderer.getDisplayName(field),
-                        name: field.name
-                    };
-                })
-            })
-        }, {
-        xtype: 'radiogroup',
-        columns: 2,
-        items: [
-            { boxLabel: 'Sum', name: 'calculationType', inputValue: 'sum' },
-            { boxLabel: 'Count', name: 'calculationType', inputValue: 'count', checked: true}
-        ]
-    }]);
-    },
-    
-     _getValidFields: function(models) {
+    _getValidFields: function(models) {
         this.model = this._getArtifactModel(models);
         var fields = _(this.model.getFields()).filter(this._shouldShowField, this).sortBy('displayName').value();
         return _.filter(fields, function(field) {
@@ -131,6 +231,11 @@ Ext.define('PieChart', {
     extend: 'Rally.app.App',
     componentCls: 'app',
     
+    layout: {
+        type: 'vbox',
+        align: 'stretch'
+    },
+    
     launch: function() {
         this._getTypes().then({
             success: this._addControls,
@@ -141,47 +246,63 @@ Ext.define('PieChart', {
     _addControls: function(types) {
         this.add([
             {
-                xtype: 'rallycustomfilterbutton',
-                context: this.getContext(),
-                modelNames: types,
-                margin: '10px',
-                stateful: true,
-                stateId: this.getContext().getScopedStateId('filters'),
-                listeners: {
-                   customfilter: {
-                        fn: this._onFilterButtonStateAvailable,
-                        single: true,
+                xtype: 'container',
+                layout: 'hbox',
+                height: 30,
+                margin: 10,
+                items: [{
+                    xtype: 'rallycustomfilterbutton',
+                    context: this.getContext(),
+                    modelNames: types,
+                    stateful: true,
+                    stateId: this.getContext().getScopedStateId('filters'),
+                    listeners: {
+                       customfilter: this._onFilterButtonStateAvailable,
+                       scope: this
+                    },
+                    toolTipConfig: {
+                        html: 'Filter',
+                        anchor: 'top',
+                        mouseOffset: [-9, -2]
+                    }
+                }, 
+                {
+                    xtype: 'component',
+                    flex: 1
+                },
+                {
+                    xtype: 'rallycombobox',
+                    itemId: 'chartType',
+                    fieldLabel: 'Chart Type:',
+                    labelAlign: 'Left',
+                    displayField: 'name',
+                    valueField: 'value',
+                    editable: false,
+                    stateful: true,
+                    labelWidth: 60,
+                    stateId: this.getContext().getScopedStateId('chartType'),
+                    store: Ext.create('Ext.data.Store', {
+                        fields: ['name', 'value'],
+                        data: [
+                            { name: 'Pie', value: 'pie' },
+                            { name: 'Bar', value: 'bar' }
+                        ]
+                    }),
+                     applyState: function(state) {
+                        //hack alert
+                        //this function is necessary to work around a defect in the sdk
+                        Rally.ui.combobox.ComboBox.superclass.applyState.call(this, state);
+                    },
+                    listeners: {
+                        select: function(combo, records){
+                            this._createChartConfigSection(combo, records);
+                        },
                         scope: this
                     }
-                },
-                toolTipConfig: {
-                    html: 'Filter',
-                    anchor: 'top',
-                    mouseOffset: [-9, -2]
-                }
+                }]
             },
-            { xtype: 'container', itemId: 'wi_filter_box', defaults: { margin: 10 }},
-            { xtype: 'container', itemId: 'chart_selector_box', defaults: { margin: 10 }, items: [{
-                xtype: 'rallycombobox',
-                displayField: 'name',
-                valueField: 'value',
-                editable: false,
-                store: Ext.create('Ext.data.Store', {
-                    fields: ['name', 'value'],
-                    data: [
-                        { name: 'Pie', value: 'pie' },
-                        { name: 'Bar', value: 'bar' }
-                    ]
-                }),
-                listeners: {
-                    select: function(combo, records){
-                        this._createChartConfigSection(combo, records);
-                    },
-                    scope: this
-                }
-            }]},
-            { xtype: 'container', itemId: 'chart_config_box', defaults: {margin: 10}}
-        ]);  
+            { xtype: 'container', itemId: 'chart_config_box', flex: 1, layout: 'fit'}
+        ]);
     },
     
     _getTypes: function() {
@@ -218,25 +339,30 @@ Ext.define('PieChart', {
     },
     
     _onFilterButtonStateAvailable: function() {
-        this._showChart();
+        this._createChart(this.down('#chartType').getValue());
     },
     
     _createChartConfigSection: function(comboBox, selectedValue) {
         this.down('#chart_config_box').removeAll();
+        delete this.chart;
         var selectedChartType = selectedValue[0].get('name');
-        this.add({
-            xtype: selectedChartType + 'chart',
-            wiTypes: this.down('rallycustomfilterbutton').getTypes(),
-            context: this.getContext()
-        });
+        this._createChart(selectedChartType);
     },
     
-    _showChart: function() {
-        var filterButton = this.down('rallycustomfilterbutton');
-        this.chart.drawChart({
-            types: filterButton.getTypes(),
-            filters: filterButton.getFilters()
-        });
+    _createChart: function(type) {
+        var filterButton = this.down('rallycustomfilterbutton'),
+            config = {
+                types: filterButton.getTypes(),
+                filters: filterButton.getFilters()
+            };
+        if(!this.chart) {
+            this.chart = this.down('#chart_config_box').add(Ext.apply({
+                xtype: type + 'chart',
+                context: this.getContext()
+            }, config));  
+        } else {
+            this.chart.refresh(config);
+        }
     }
 });
 
