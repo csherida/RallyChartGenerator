@@ -1,4 +1,4 @@
-Ext.define('PieCalculator', {
+Ext.define('BarCalculator', {
     config: {
         calculationType: undefined,
         field: undefined
@@ -33,10 +33,25 @@ Ext.define('PieCalculator', {
         }
         
         return {
-            categories: categories,
+            xAxis: {
+                categories: categories
+            },
+            yAxis: {
+                min: 0,
+                title: {
+                    text: 'Total fruit consumption'
+                },
+                stackLabels: {
+                    enabled: true,
+                    style: {
+                        fontWeight: 'bold',
+                        color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                    }
+                }
+            },
             series: [
                 {
-                    type: 'pie',
+                    type: 'column',
                     data: seriesData
                 }
             ]

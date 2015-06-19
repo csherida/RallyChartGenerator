@@ -127,6 +127,8 @@ Ext.define('CustomApp', {
                 filters: filterButton.getFilters()
             };
         if(!this.chart) {
+            //debugger;
+            this.down('#chart_config_box').removeAll();
             this.chart = this.down('#chart_config_box').add(Ext.apply({
                 xtype: type + 'chart',
                 context: this.getContext()
