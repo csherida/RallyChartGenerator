@@ -795,7 +795,7 @@ Ext.define('CfdChart', {
                 _ProjectHierarchy: this.getContext().getProject().ObjectID,
                 _ValidFrom: {
                     //TODO: replace default date filter?
-                    '$gt': Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(), 'day', -30)) 
+                    '$gt': Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(), 'day', -90)) 
                 }
             },
             fetch: ['PlanEstimate', this.down('#aggregationField').getValue()],
@@ -806,6 +806,37 @@ Ext.define('CfdChart', {
             context: this.getContext().getDataContext(),
             limit: Infinity
         };
+
+        if(this.filters.length && this.filters[0].property === 'Milestones') {
+            var milestoneRef = this.filters[0].value;
+            var milestoneOid = Rally.util.Ref.getOidFromRef(milestoneRef);
+            delete storeConfig.find._ProjectHierarchy;
+            return Rally.data.ModelFactory.getModel({
+                type: Rally.util.Ref.getTypeFromRef(milestoneRef)
+            }).then({
+                success: function(model) {
+                    return model.load(milestoneOid, {
+                        fetch: ['TargetDate', 'Artifacts']
+                    }).then({
+                        success: function(record) {
+                            //todo set valid from date based on actual start dates of work
+                            return record.getCollection('Artifacts').load({
+                                limit: Infinity
+                            }).then({
+                                success: function(artifacts) {
+                                    storeConfig.find._ItemHierarchy = {'$in': _.invoke(artifacts, 'getId')};
+                                    return storeConfig;
+                                },
+                                scope: this
+                            });
+                        },
+                        scope: this
+                    });
+                },
+                scope: this
+            });
+        }
+
         return Deft.Promise.when(storeConfig);
     },
 
@@ -1246,6 +1277,7 @@ Ext.define('BurnChart', {
                 margin: 10,
                 items: [{
                     xtype: 'rallycustomfilterbutton',
+                    whiteListFields: ['Milestones'],
                     context: this.getContext(),
                     modelNames: types,
                     stateful: true,

@@ -23,6 +23,7 @@ Ext.define('CustomApp', {
                 margin: 10,
                 items: [{
                     xtype: 'rallycustomfilterbutton',
+                    whiteListFields: ['Milestones'],
                     context: this.getContext(),
                     modelNames: types,
                     stateful: true,
