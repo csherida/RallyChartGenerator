@@ -4,7 +4,8 @@ Ext.define('PieChart', {
     alias: 'widget.piechart',
     config: {
         types: [],
-        context: undefined
+        context: undefined,
+        filters: []
     },
     
     layout: {
@@ -112,19 +113,20 @@ Ext.define('PieChart', {
     _getFilterSummaryHtml: function() {
         return Ext.String.format('<ul>{0}</ul>', _.map(this.filters, function(filter) {
             return Ext.String.format('<li>{0}</li>', filter.toString());
-        }).join(''));
+        }).join('')) || 'Showing all data';
     },
     
     _showChart: function() {
        this.insert(2, {
             xtype: 'rallychart',
-            flex: 1,
+            flex: 10,
             storeType: 'Rally.data.wsapi.artifact.Store',
             storeConfig: {
                 models: this.types,
                 context: this.getContext().getDataContext(),
                 limit: Infinity,
-                filters: this.filters
+                filters: this.filters,
+                fetch: ['PlanEstimate', this.down('#aggregationField').getValue()]
             },
             calculatorType: 'PieCalculator',
             calculatorConfig: {
